@@ -3,12 +3,7 @@ from typing import List
 from pydantic import BaseModel
 
 
-class UploadResponse(BaseModel):
-    document_id: str
-    original_filename: str
-    file_type: str
-    status: str
-    message: str
+
 
 
 class ExtractedFields(BaseModel):
@@ -32,6 +27,17 @@ class ExtractedFields(BaseModel):
     total_amount: Optional[float] = None
     currency: Optional[str] = None
     multiple_documents_detected: bool = False
+
+
+class UploadResponse(BaseModel):
+    document_id: str
+    original_filename: str
+    file_type: str
+    status: str
+    message: str
+    extracted_fields: Optional[ExtractedFields] = None
+    warnings: List[str] = []
+
 
 class ValidationResult(BaseModel):
     """

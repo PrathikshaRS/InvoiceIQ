@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     ocr_dpi: int = 300
     tesseract_cmd: str = ""
 
+    #MongoDB Settings
+    mongodb_uri: str = "mongodb://localhost:27017"
+    mongodb_db_name: str = "invoiceiq"
+    mongodb_collection_name: str = "invoices"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
