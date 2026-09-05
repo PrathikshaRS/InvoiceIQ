@@ -1,5 +1,5 @@
 from typing import Optional
-
+from typing import List
 from pydantic import BaseModel
 
 
@@ -32,3 +32,12 @@ class ExtractedFields(BaseModel):
     total_amount: Optional[float] = None
     currency: Optional[str] = None
     multiple_documents_detected: bool = False
+
+class ValidationResult(BaseModel):
+    """
+    status: 'processed' (no issues), 'needs_review' (one or more warnings,
+    but data is still usable), or 'rejected' (document couldn't be
+    reliably processed at all, e.g. multiple concatenated invoices).
+    """
+    status: str
+    warnings: List[str] = []
