@@ -1,21 +1,17 @@
 import logging
 
-logger = logging.getLogger(__name__)
-
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from typing import Optional
+
 from app.models.schemas import UploadResponse
-from app.services.invoice_service import (
-    validate_file, save_upload, save_processed_document, get_processed_document,
-)
 from app.services.ocr_service import extract_text
 from app.services.nlp_service import extract_fields
 from app.services.validation_service import validate_fields
 from app.services.invoice_service import (
     validate_file, save_upload, save_processed_document,
-    save_failed_document, get_processed_document,
+    save_failed_document, get_processed_document, maybe_save_to_sql,
 )
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 
@@ -30,6 +26,7 @@ async def upload_invoice(file: UploadFile = File(...)) -> UploadResponse:
         raw_text = extract_text(saved_path, extension)
         fields = extract_fields(raw_text)
         validation = validate_fields(fields)
+
     except Exception:
         logger.exception(
             "Processing failed for document_id=%s (%s)", document_id, file.filename
@@ -59,15 +56,7 @@ async def upload_invoice(file: UploadFile = File(...)) -> UploadResponse:
         validation=validation,
     )
 
-    return UploadResponse(
-        document_id=document_id,
-        original_filename=file.filename or "unknown",
-        file_type=extension,
-        status=validation.status,
-        message=f"File processed with status '{validation.status}'.",
-        extracted_fields=fields,
-        warnings=validation.warnings,
-    )
+    maybe_save_to_sql(document_id, fields, validation.status)
 
     return UploadResponse(
         document_id=document_id,

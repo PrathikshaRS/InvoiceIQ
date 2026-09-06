@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     mongodb_db_name: str = "invoiceiq"
     mongodb_collection_name: str = "invoices"
 
+    #MS SQL Server Settings
+    sqlserver_host: str = "localhost"
+    sqlserver_port: int = 1433
+    sqlserver_database: str = "invoiceiq"
+    sqlserver_username: str = "sa"
+    sqlserver_password: str = ""
+    sqlserver_driver: str = "ODBC Driver 18 for SQL Server"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

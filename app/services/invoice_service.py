@@ -14,8 +14,50 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.db.mongodb import get_invoices_collection
+from app.db.sqlserver import save_invoice_to_sql
 from app.models.schemas import ExtractedFields, ValidationResult
 
+
+SQL_ELIGIBLE_STATUSES = {"processed", "needs_review"}
+
+
+def maybe_save_to_sql(document_id: str, fields: ExtractedFields, status: str) -> None:
+    """
+    Writes a structured row to SQL Server if - and only if - the document
+    was actually processed (not rejected/failed) AND the three fields SQL
+    Server requires as NOT NULL were all successfully extracted. This can
+    mean a 'needs_review' document is skipped here even though it exists
+    fully in Mongo - e.g. missing invoice_date alone doesn't block the SQL
+    write, but a missing total_amount does.
+
+    A SQL write failure is logged but never raised - the Mongo record is
+    already the source of truth for this document, so a SQL Server issue
+    (e.g. the container being down) shouldn't turn a successful upload
+    into a failed one.
+    """
+    if status not in SQL_ELIGIBLE_STATUSES:
+        return
+
+    if not (fields.vendor_name and fields.invoice_number and fields.total_amount):
+        return
+
+    try:
+        save_invoice_to_sql(
+            document_id=document_id,
+            vendor_name=fields.vendor_name,
+            gstin=None,  # not yet extracted separately from vendor_name - see Known Issues
+            invoice_number=fields.invoice_number,
+            invoice_date=fields.invoice_date,
+            subtotal=fields.subtotal,
+            tax_amount=fields.tax_amount,
+            total_amount=fields.total_amount,
+            currency=fields.currency,
+            status=status,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to write document %s to SQL Server", document_id
+        )
 
 def validate_file(file: UploadFile) -> str:
     """
