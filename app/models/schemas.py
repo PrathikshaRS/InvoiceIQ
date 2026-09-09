@@ -37,6 +37,7 @@ class UploadResponse(BaseModel):
     message: str
     extracted_fields: Optional[ExtractedFields] = None
     warnings: List[str] = []
+    is_duplicate: bool = False
 
 
 class ValidationResult(BaseModel):

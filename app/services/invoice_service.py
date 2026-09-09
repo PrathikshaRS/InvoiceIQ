@@ -14,9 +14,8 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.db.mongodb import get_invoices_collection
-from app.db.sqlserver import save_invoice_to_sql
 from app.models.schemas import ExtractedFields, ValidationResult
-
+from app.db.sqlserver import save_invoice_to_sql, find_duplicate_invoice, search_invoices as sql_search_invoices, get_analytics as sql_get_analytics
 
 SQL_ELIGIBLE_STATUSES = {"processed", "needs_review"}
 
@@ -58,6 +57,53 @@ def maybe_save_to_sql(document_id: str, fields: ExtractedFields, status: str) ->
         logger.exception(
             "Failed to write document %s to SQL Server", document_id
         )
+
+def check_for_duplicate(fields: ExtractedFields) -> Optional[dict]:
+    """
+    Checks SQL Server for a prior invoice with the same vendor name,
+    invoice number, and total amount. Uses the same three-field
+    eligibility as maybe_save_to_sql, since those are the only fields
+    reliable enough to compare on.
+
+    A SQL Server failure here is logged but never raised - duplicate
+    detection is a nice-to-have warning, not something that should turn
+    a successful upload into a failure.
+    """
+    if not (fields.vendor_name and fields.invoice_number and fields.total_amount):
+        return None
+
+    try:
+        return find_duplicate_invoice(
+            vendor_name=fields.vendor_name,
+            invoice_number=fields.invoice_number,
+            total_amount=fields.total_amount,
+        )
+    except Exception:
+        logger.exception("Duplicate check against SQL Server failed")
+        return None
+
+def search_invoices(
+    vendor: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    min_amount: float | None = None,
+    max_amount: float | None = None,
+    status: str | None = None,
+) -> list[dict]:
+    """
+    Thin pass-through to the SQL Server search query. Unlike duplicate
+    detection or maybe_save_to_sql, a search failure IS surfaced to the
+    client as an error - there's no fallback data source to silently
+    succeed with if SQL Server is unreachable.
+    """
+    try:
+        return sql_search_invoices(
+            vendor_name=vendor, date_from=date_from, date_to=date_to,
+            min_amount=min_amount, max_amount=max_amount, status=status,
+        )
+    except Exception:
+        logger.exception("Invoice search failed")
+        raise HTTPException(status_code=503, detail="Search is temporarily unavailable.")
 
 def validate_file(file: UploadFile) -> str:
     """
@@ -107,6 +153,7 @@ def save_processed_document(
     raw_text: str,
     fields: ExtractedFields,
     validation: ValidationResult,
+    is_duplicate: bool = False,
 ) -> None:
     """Persists the full result of processing one document to MongoDB."""
     collection = get_invoices_collection()
@@ -118,6 +165,7 @@ def save_processed_document(
         "extracted_fields": fields.model_dump(),
         "status": validation.status,
         "warnings": validation.warnings,
+        "is_duplicate": is_duplicate,
         "upload_timestamp": datetime.now(timezone.utc).isoformat(),
     })
 
@@ -145,6 +193,17 @@ def save_failed_document(
         "upload_timestamp": datetime.now(timezone.utc).isoformat(),
     })
 
+def get_analytics() -> dict:
+    """
+    Thin pass-through to the SQL Server analytics query. Same reasoning
+    as search_invoices: a failure here is surfaced as a 503, not swallowed,
+    since there's no meaningful fallback data source for a dashboard stat.
+    """
+    try:
+        return sql_get_analytics()
+    except Exception:
+        logger.exception("Analytics query failed")
+        raise HTTPException(status_code=503, detail="Analytics is temporarily unavailable.")
 
 def get_processed_document(document_id: str) -> Optional[dict]:
     """Fetches a stored document by its document_id, or None if not found."""

@@ -97,18 +97,23 @@ def _extract_amounts_from_line(line: str) -> list[float]:
 
 # Short trailing tokens that are legitimate parts of a business name,
 # not OCR noise - protected from the trailing-noise strip below.
-_LEGIT_SHORT_SUFFIXES = {"ltd", "llp", "inc", "co", "pvt", "llc", "plc"}
+_LEGIT_SHORT_SUFFIXES = {"ltd", "llp", "inc", "co", "pvt", "llc", "plc", "corp", "gmbh"}
 
 
 def _clean_vendor_candidate(candidate: Optional[str]) -> Optional[str]:
     """
     Strips trailing OCR noise bled in from background graphics near the
-    vendor name - short, meaningless trailing tokens like "Es a ga ae".
+    vendor name - short, meaningless trailing tokens like "Been ane hei".
 
     Works token-by-token from the end: a trailing token is stripped if
-    it's short (<=2 chars) AND not a recognized business-name suffix
+    it's short (<=4 chars) AND not a recognized business-name suffix
     (case-insensitive), continuing until a real/longer token is hit.
     Never strips down to nothing - an honest null beats an empty string.
+
+    Threshold was raised from <=2 to <=4 chars after a real sample
+    ("Geddit Convenience Private Limited Been ane hei") showed 3-4 char
+    noise tokens surviving the original stricter check, causing the same
+    vendor to fragment into two separate SQL Server rows.
     """
     if not candidate:
         return None
@@ -116,7 +121,7 @@ def _clean_vendor_candidate(candidate: Optional[str]) -> Optional[str]:
     tokens = candidate.split()
     while len(tokens) > 1:
         last = tokens[-1].strip(".,")
-        if len(last) <= 2 and last.lower() not in _LEGIT_SHORT_SUFFIXES:
+        if len(last) <= 4 and last.lower() not in _LEGIT_SHORT_SUFFIXES:
             tokens.pop()
         else:
             break
