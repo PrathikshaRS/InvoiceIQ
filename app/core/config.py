@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     allowed_extensions: set[str] = {".pdf", ".png", ".jpg", ".jpeg"}
 
     #OCR Settings
-    ocr_dpi: int = 300
+    ocr_dpi: int = 150
     tesseract_cmd: str = ""
 
     #MongoDB Settings
