@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.env.test
+uploads/*
+!uploads/.gitkeep
+.git/
+.pytest_cache/
+tests/fixtures/
