@@ -19,7 +19,7 @@ def get_connection() -> pyodbc.Connection:
         f"PWD={settings.sqlserver_password};"
         f"TrustServerCertificate=yes;"
     )
-    return pyodbc.connect(conn_str)
+    return pyodbc.connect(conn_str, timeout=60)
 
 
 def get_or_create_vendor(
